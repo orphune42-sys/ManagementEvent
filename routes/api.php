@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\EventController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -17,3 +18,10 @@ Route::middleware('auth:api')->group(function () {
     // PROFIL PENGGUNA
     Route::get('/profile', [AuthController::class, 'me']);
 });
+
+Route::get('/events', [EventController::class, 'index']);
+Route::get('/events/{id}', [EventController::class, 'show']);
+Route::post('/events', [EventController::class, 'store']);
+Route::put('/events/{id}', [EventController::class, 'update']);
+Route::patch('/events/{id}', [EventController::class, 'update']);
+Route::delete('/events/{id}', [EventController::class, 'destroy']);
