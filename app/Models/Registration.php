@@ -9,7 +9,7 @@ class Registration extends Model {
     protected $primaryKey = 'registration_id';
 
     protected $fillable = [
-        'participant_id',
+        'user_id',
         'id_event',
         'registration_code',
         'registration_date',
@@ -18,9 +18,9 @@ class Registration extends Model {
         'total_payment'
     ];
 
-    public function participant() {
+    public function user() {
         return $this->belongsTo(
-            Participant::class,'participant_id', 'participant_id'
+            User::class,'user_id', 'user_id'
         );
     }
 

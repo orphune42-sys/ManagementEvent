@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 class RegistrationController extends Controller {
     public function index(){
         $registrations = Registration::with([
-            'participant',
+            'user',
             'event'
         ])->get();
 
@@ -21,7 +21,7 @@ class RegistrationController extends Controller {
 
     public function show(string $id){
         $registration = Registration::with([
-            'participant',
+            'user',
             'event'
         ])->find($id);
 
@@ -39,12 +39,22 @@ class RegistrationController extends Controller {
 
     public function store(Request $request){
         $validated = $request->validate([
-            'participant_id' => 'required|exists:participants,participant_id',
+            'user_id' => 'required|exists:users,id',
             'id_event' => 'required|exists:events,id_event',
         ]);
 
+        $alreadyRegistered = Registration::where('user_id', $validated['user_id'])
+            ->where('id_event', $validated['id_event'])
+            ->exists();
+
+        if ($alreadyRegistered) {
+            return response()->json([
+                'message' => 'Pengguna sudah terdaftar pada event ini'
+            ], 422);
+        }
+
         $registration = Registration::create([
-            'participant_id' => $validated['participant_id'],
+            'user_id' => $validated['user_id'],
             'id_event' => $validated['id_event'],
             'registration_code' => 'REG-' . Str::upper(Str::random(10)),
             'registration_date' => now(),
