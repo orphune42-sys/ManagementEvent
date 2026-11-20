@@ -4,9 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Participant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
@@ -19,13 +18,6 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-
-            'phone_number' => 'required|string|max:20',
-            'birth_date' => 'nullable|date',
-            'gender' => 'nullable|string|max:20',
-            'city' => 'nullable|string|max:100',
-            'occupation' => 'nullable|string|max:100',
-            'organization' => 'nullable|string|max:150',
         ]);
 
         if ($validator->fails()) {
@@ -35,33 +27,23 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = DB::transaction(function () use ($request) {
-            // Simpan akun
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => $request->password,
-            ]);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => $request->password,
+            'role' => 'user',
+        ]);
 
-            // Simpan profil peserta
-            Participant::create([
-                'user_id' => $user->id,
-                'phone_number' => $request->phone_number,
-                'birth_date' => $request->birth_date,
-                'gender' => $request->gender,
-                'city' => $request->city,
-                'occupation' => $request->occupation,
-                'organization' => $request->organization,
-            ]);
-
-            return $user;
-        });
-
-        // Buat JWT
         $token = JWTAuth::fromUser($user);
+
         return response()->json([
             'message' => 'Registrasi berhasil',
-            'user' => $user->load('participant'),
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]),
             'access_token' => $token,
             'token_type' => 'bearer',
         ], 201);
@@ -81,13 +63,16 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = User::with('participant')
-            ->where('email', $credentials['email'])
-            ->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         return response()->json([
             'message' => 'Login berhasil',
-            'user' => $user,
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]),
             'access_token' => $token,
             'token_type' => 'bearer',
             'expires_in' => JWTAuth::factory()->getTTL() * 60,
@@ -110,7 +95,12 @@ class AuthController extends Controller
         $user = JWTAuth::parseToken()->authenticate();
 
         return response()->json([
-            'user' => $user->load('participant'),
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+            ]),
         ]);
     }
 }
