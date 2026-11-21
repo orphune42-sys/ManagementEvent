@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class EventController extends Controller
 {
     public function index()
     {
-        $events = Event::all();
+        $events = Event::with('creator')->get();
 
         return response()->json([
             'success' => true,
@@ -20,7 +21,7 @@ class EventController extends Controller
 
     public function show($id)
     {
-        $event = Event::find($id);
+        $event = Event::with('creator')->find($id);
 
         if (!$event) {
             return response()->json([
@@ -39,13 +40,16 @@ class EventController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama_event' => 'required|string|max:255',
-            'deskripsi' => 'required|string',
-            'tanggal_event' => 'required|date',
-            'lokasi' => 'required|string|max:255',
-            'kuota_peserta' => 'required|integer|min:1',
-            'status_event' => 'required|string|max:50',
+            'title'       => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'start_at'    => 'required|date',
+            'end_at'      => 'required|date|after_or_equal:start_at',
+            'location'    => 'required|string|max:255',
+            'quota'       => 'required|integer|min:1',
+            'status'      => 'required|string|max:20',
         ]);
+
+        $validated['created_by'] = Auth::id();
 
         $event = Event::create($validated);
 
@@ -67,13 +71,22 @@ class EventController extends Controller
             ], 404);
         }
 
+        $user = Auth::user();
+        if ($user->role !== 'admin' && $event->created_by !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses untuk mengubah event ini'
+            ], 403);
+        }
+
         $validated = $request->validate([
-            'nama_event' => 'sometimes|required|string|max:255',
-            'deskripsi' => 'sometimes|required|string',
-            'tanggal_event' => 'sometimes|required|date',
-            'lokasi' => 'sometimes|required|string|max:255',
-            'kuota_peserta' => 'sometimes|required|integer|min:1',
-            'status_event' => 'sometimes|required|string|max:50',
+            'title'       => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'start_at'    => 'sometimes|required|date',
+            'end_at'      => 'sometimes|required|date|after_or_equal:start_at',
+            'location'    => 'sometimes|required|string|max:255',
+            'quota'       => 'sometimes|required|integer|min:1',
+            'status'      => 'sometimes|required|string|max:20',
         ]);
 
         $event->update($validated);
