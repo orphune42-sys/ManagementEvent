@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\CertificateController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -37,6 +38,12 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/registrations/{id}', [RegistrationController::class, 'update']);
         Route::patch('/registrations/{id}', [RegistrationController::class, 'update']);
 
+        // CERTIFICATES
+        Route::get('/certificates', [CertificateController::class, 'index']);
+        Route::get('/certificates/{id}', [CertificateController::class, 'show']);
+        Route::post('/certificates', [CertificateController::class, 'store']);
+        Route::put('/certificates/{id}', [CertificateController::class, 'update']);
+        Route::patch('/certificates/{id}', [CertificateController::class, 'update']);
     });
 
     // AKSES ADMIN SAJA: DELETE
@@ -51,6 +58,7 @@ Route::middleware('auth:api')->group(function () {
         // REGISTRATIONS
         Route::delete('/registrations/{id}', [RegistrationController::class, 'destroy']);
 
+        // CERTIFICATES
+        Route::delete('/certificates/{id}', [CertificateController::class, 'destroy']);
     });
-
 });
