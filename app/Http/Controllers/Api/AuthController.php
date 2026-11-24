@@ -11,7 +11,6 @@ use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
-    // REGISTER
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -49,7 +48,6 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // LOGIN
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -79,7 +77,6 @@ class AuthController extends Controller
         ]);
     }
 
-    // LOGOUT
     public function logout()
     {
         JWTAuth::invalidate(JWTAuth::getToken());
@@ -89,7 +86,6 @@ class AuthController extends Controller
         ]);
     }
 
-    // PROFIL PENGGUNA
     public function me()
     {
         $user = JWTAuth::parseToken()->authenticate();
