@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class EventController extends Controller
 {
+    // Menampilkan daftar semua event
     public function index()
     {
         $events = Event::with('creator')->get();
@@ -19,6 +20,7 @@ class EventController extends Controller
         ], 200);
     }
 
+    // Menampilkan event berdasarkan ID
     public function show($id)
     {
         $event = Event::with('creator')->find($id);
@@ -37,6 +39,7 @@ class EventController extends Controller
         ], 200);
     }
 
+    // Menambahkan event baru
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -60,6 +63,7 @@ class EventController extends Controller
         ], 201);
     }
 
+    // Mengubah event berdasarkan ID
     public function update(Request $request, $id)
     {
         $event = Event::find($id);
@@ -71,6 +75,7 @@ class EventController extends Controller
             ], 404);
         }
 
+        // Cek kepelimilikan data
         $user = Auth::user();
         if ($user->role !== 'admin' && $event->created_by !== $user->id) {
             return response()->json([
@@ -98,6 +103,7 @@ class EventController extends Controller
         ], 200);
     }
 
+    // Menghapus event berdasarkan ID
     public function destroy($id)
     {
         $event = Event::find($id);
