@@ -7,10 +7,10 @@ use Illuminate\Http\Request;
 
 class TicketController extends Controller
 {
-    // READ: Menampilkan semua tiket
+    // READ: Menampilkan semua tiket beserta event dan pembuat tiket
     public function index()
     {
-        $tickets = Ticket::with('event')->get();
+        $tickets = Ticket::with(['event', 'user:id,name,email,role'])->get();
 
         return response()->json([
             'success' => true,
@@ -22,7 +22,7 @@ class TicketController extends Controller
     // READ: Menampilkan detail tiket
     public function show($id)
     {
-        $ticket = Ticket::with('event')->find($id);
+        $ticket = Ticket::with(['event', 'user:id,name,email,role'])->find($id);
 
         if (!$ticket) {
             return response()->json([
@@ -48,6 +48,9 @@ class TicketController extends Controller
             'kuota_tiket' => 'required|integer|min:1',
         ]);
 
+        // Otomatis mengisi user_id dari akun yang sedang login
+        $validated['user_id'] = auth('api')->id();
+
         $ticket = Ticket::create($validated);
 
         return response()->json([
@@ -57,7 +60,7 @@ class TicketController extends Controller
         ], 201);
     }
 
-    // UPDATE: Mengubah data tiket
+    // UPDATE: Mengubah data tiket (Plus aturan Ownership Poin 2.4)
     public function update(Request $request, $id)
     {
         $ticket = Ticket::find($id);
@@ -67,6 +70,16 @@ class TicketController extends Controller
                 'success' => false,
                 'message' => 'Tiket tidak ditemukan'
             ], 404);
+        }
+
+        $user = auth('api')->user();
+
+        // Cek Ownership: jika bukan admin dan bukan pembuat tiket, tolak akses
+        if ($user->role !== 'admin' && $ticket->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda hanya diizinkan mengubah data tiket yang Anda buat sendiri'
+            ], 403);
         }
 
         $validated = $request->validate([

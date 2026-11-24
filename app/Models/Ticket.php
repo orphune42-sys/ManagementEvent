@@ -11,6 +11,7 @@ class Ticket extends Model
     protected $primaryKey = 'id_tiket';
 
     protected $fillable = [
+        'user_id',
         'id_event',
         'nama_tiket',
         'harga',
@@ -20,5 +21,10 @@ class Ticket extends Model
     public function event()
     {
         return $this->belongsTo(Event::class, 'id_event', 'id_event');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

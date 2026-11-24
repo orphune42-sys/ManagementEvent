@@ -27,8 +27,11 @@ Route::middleware('auth:api')->group(function () {
         Route::patch('/events/{id}', [EventController::class, 'update']);
 
         // TICKETS
-        Route::apiResource('tickets', TicketController::class)
-            ->except(['destroy']);
+        Route::get('/tickets', [TicketController::class, 'index']);
+        Route::get('/tickets/{id}', [TicketController::class, 'show']);
+        Route::post('/tickets', [TicketController::class, 'store']);
+        Route::put('/tickets/{id}', [TicketController::class, 'update']);
+        Route::patch('/tickets/{id}', [TicketController::class, 'update']);
 
         // REGISTRATIONS
         Route::get('/registrations', [RegistrationController::class, 'index']);

@@ -11,6 +11,10 @@ return new class extends Migration
         Schema::create('tickets', function (Blueprint $table) {
             $table->id('id_tiket');
 
+            $table->foreignId('user_id')
+                  ->constrained('users')
+                  ->cascadeOnDelete();
+
             $table->foreignId('id_event')
                   ->constrained('events', 'id_event')
                   ->cascadeOnDelete();
