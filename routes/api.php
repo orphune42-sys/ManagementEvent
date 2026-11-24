@@ -9,6 +9,7 @@ use App\Http\Controllers\CertificateController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/events', [EventController::class, 'index']);
 
 Route::middleware('auth:api')->group(function () {
 
@@ -20,7 +21,6 @@ Route::middleware('auth:api')->group(function () {
     Route::middleware('role:user,admin')->group(function () {
 
         // EVENTS
-        Route::get('/events', [EventController::class, 'index']);
         Route::get('/events/{id}', [EventController::class, 'show']);
         Route::post('/events', [EventController::class, 'store']);
         Route::put('/events/{id}', [EventController::class, 'update']);
