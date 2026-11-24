@@ -37,13 +37,12 @@ class Registration extends Model
         );
     }
 
-    public function certificates()
+    public function certificate()
     {
-        return $this->hasMany(
+        return $this->hasOne(
             Certificate::class,
             'registration_id',
             'registration_id'
         );
     }
-
 }

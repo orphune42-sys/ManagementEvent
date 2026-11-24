@@ -2,206 +2,234 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Registration;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CertificateController extends Controller
 {
-    // READ: Menampilkan semua sertifikat
-    public function index()
+    // Menampilkan seluruh pengajuan atau pengajuan milik user
+    public function index(Request $request)
     {
         $query = Certificate::with([
-            'registration.user',
+            'user',
             'registration.event'
         ]);
 
-        // User hanya melihat sertifikat miliknya
-        if (auth()->user()->role !== 'admin') {
-            $query->whereHas('registration', function ($q) {
-                $q->where('user_id', auth()->id());
-            });
+        if ($request->user()->role !== 'admin') {
+            $query->where('user_id', $request->user()->id);
         }
 
-        $certificates = $query->get();
-
         return response()->json([
-            'message' => 'Daftar sertifikat berhasil ditampilkan',
-            'data' => $certificates
-        ], 200);
+            'message' => 'Data sertifikat berhasil diambil.',
+            'data' => $query->latest()->get()
+        ]);
     }
 
-    // READ: Menampilkan detail sertifikat
-    public function show($id)
+    // Menampilkan detail pengajuan
+    public function show(Request $request, $id)
     {
         $query = Certificate::with([
-            'registration.user',
+            'user',
             'registration.event'
         ]);
 
-        if (auth()->user()->role !== 'admin') {
-            $query->whereHas('registration', function ($q) {
-                $q->where('user_id', auth()->id());
-            });
+        if ($request->user()->role !== 'admin') {
+            $query->where('user_id', $request->user()->id);
         }
 
-        $certificate = $query->find($id);
-
-        if (!$certificate) {
-            return response()->json([
-                'message' => 'Sertifikat tidak ditemukan'
-            ], 404);
-        }
+        $certificate = $query->findOrFail($id);
 
         return response()->json([
-            'message' => 'Detail sertifikat berhasil ditampilkan',
+            'message' => 'Detail sertifikat berhasil diambil.',
             'data' => $certificate
-        ], 200);
+        ]);
     }
 
-    // CREATE: Menambahkan sertifikat
+    // Membuat pengajuan sertifikat
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $isAdmin = $request->user()->role === 'admin';
+
+        $rules = [
             'registration_id' => [
                 'required',
                 'exists:registrations,registration_id',
                 'unique:certificates,registration_id'
             ],
-            'certificate_number' => 'required|string|max:255|unique:certificates,certificate_number',
-            'issued_at' => 'nullable|date',
-            'certificate_file' => 'nullable|file|mimes:pdf|max:5120',
-            'status' => 'sometimes|string|max:255',
-        ]);
+            'recipient_name' => [
+                'required',
+                'string',
+                'max:255'
+            ],
+        ];
 
-        // Pastikan user hanya membuat sertifikat untuk registrasinya sendiri
-        $registration = Registration::find($validated['registration_id']);
+        if ($isAdmin) {
+            $rules['certificate_number'] = [
+                'nullable',
+                'string',
+                'max:255',
+                'unique:certificates,certificate_number'
+            ];
 
-        if (
-            auth()->user()->role !== 'admin' &&
-            $registration->user_id != auth()->id()
-        ) {
+            $rules['issued_at'] = [
+                'nullable',
+                'date'
+            ];
+
+            $rules['status'] = [
+                'sometimes',
+                'in:Menunggu,Terbit,Ditolak'
+            ];
+        }
+
+        $validated = $request->validate($rules);
+
+        $registration = Registration::findOrFail(
+            $validated['registration_id']
+        );
+
+        // Registrasi yang dibatalkan tidak dapat digunakan untuk pengajuan sertifikat
+        if ($registration->registration_status === 'Dibatalkan') {
             return response()->json([
-                'message' => 'Kamu tidak memiliki akses ke registrasi tersebut'
+                'message' => 'Anda tidak dapat mengajukan sertifikat karena registrasi telah dibatalkan.'
+            ], 422);
+        }
+
+        // User hanya boleh mengajukan sertifikat dari registration miliknya
+        if (!$isAdmin && $registration->user_id != $request->user()->id) {
+            return response()->json([
+                'message' => 'Kamu tidak memiliki akses ke pendaftaran tersebut.'
             ], 403);
         }
 
-        // Upload file sertifikat
-        if ($request->hasFile('certificate_file')) {
-            $validated['file_path'] = $request->file('certificate_file')
-                ->store('certificates', 'public');
+        // user_id diambil otomatis dari pemilik registration
+        $data = [
+            'user_id' => $registration->user_id,
+            'registration_id' => $registration->registration_id,
+            'recipient_name' => $validated['recipient_name'],
+        ];
 
-            unset($validated['certificate_file']);
+        if ($isAdmin) {
+            $data['certificate_number'] =
+                $validated['certificate_number'] ?? null;
+
+            $data['issued_at'] = $validated['issued_at'] ?? null;
+            $data['status'] = $validated['status'] ?? 'Menunggu';
         }
 
-        $certificate = Certificate::create($validated);
+        $certificate = Certificate::create($data);
 
         return response()->json([
-            'message' => 'Sertifikat berhasil ditambahkan',
-            'data' => $certificate->load('registration.user', 'registration.event')
+            'message' => 'Pengajuan sertifikat berhasil dibuat.',
+            'data' => $certificate
         ], 201);
     }
 
-    // UPDATE: Mengubah data sertifikat
+    // Mengubah pengajuan sertifikat
     public function update(Request $request, $id)
     {
+        $isAdmin = $request->user()->role === 'admin';
+
         $query = Certificate::query();
 
-        if (auth()->user()->role !== 'admin') {
-            $query->whereHas('registration', function ($q) {
-                $q->where('user_id', auth()->id());
-            });
+        if (!$isAdmin) {
+            $query->where('user_id', $request->user()->id);
         }
 
-        $certificate = $query->find($id);
+        $certificate = $query->findOrFail($id);
 
-        if (!$certificate) {
+        // User hanya bisa mengubah pengajuan yang masih menunggu
+        if (!$isAdmin && $certificate->status !== 'Menunggu') {
             return response()->json([
-                'message' => 'Sertifikat tidak ditemukan'
-            ], 404);
+                'message' => 'Pengajuan yang sudah diproses tidak dapat diubah.'
+            ], 403);
         }
 
-        $validated = $request->validate([
-            'registration_id' => [
-                'sometimes',
-                'required',
-                'exists:registrations,registration_id',
-                Rule::unique('certificates', 'registration_id')
-                    ->ignore($certificate->certificate_id, 'certificate_id'),
-            ],
-            'certificate_number' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('certificates', 'certificate_number')
-                    ->ignore($certificate->certificate_id, 'certificate_id'),
-            ],
-            'issued_at' => 'sometimes|nullable|date',
-            'certificate_file' => 'nullable|file|mimes:pdf|max:5120',
-            'status' => 'sometimes|required|string|max:255',
-        ]);
+        if (!$isAdmin) {
+            $validated = $request->validate([
+                'recipient_name' => [
+                    'required',
+                    'string',
+                    'max:255'
+                ],
+            ]);
 
-        // Jika registration_id diubah, periksa kepemilikannya
-        if (isset($validated['registration_id'])) {
-            $registration = Registration::find($validated['registration_id']);
+            $certificate->update($validated);
+        } else {
+            $validated = $request->validate([
+                'registration_id' => [
+                    'sometimes',
+                    'required',
+                    'exists:registrations,registration_id',
+                    Rule::unique('certificates', 'registration_id')
+                        ->ignore($certificate->certificate_id, 'certificate_id')
+                ],
+                'recipient_name' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255'
+                ],
+                'certificate_number' => [
+                    'sometimes',
+                    'nullable',
+                    'string',
+                    'max:255',
+                    Rule::unique('certificates', 'certificate_number')
+                        ->ignore($certificate->certificate_id, 'certificate_id')
+                ],
+                'issued_at' => [
+                    'sometimes',
+                    'nullable',
+                    'date'
+                ],
+                'status' => [
+                    'sometimes',
+                    'in:Menunggu,Terbit,Ditolak'
+                ],
+            ]);
 
-            if (
-                auth()->user()->role !== 'admin' &&
-                $registration->user_id != auth()->id()
-            ) {
-                return response()->json([
-                    'message' => 'Kamu tidak memiliki akses ke registrasi tersebut'
-                ], 403);
+            // Jika registration diganti, periksa status dan ambil pemilik registration baru
+            if (isset($validated['registration_id'])) {
+                $registration = Registration::findOrFail(
+                    $validated['registration_id']
+                );
+
+                // Registrasi yang dibatalkan tidak dapat digunakan untuk sertifikat
+                if ($registration->registration_status === 'Dibatalkan') {
+                    return response()->json([
+                        'message' => 'Registrasi yang telah dibatalkan tidak dapat digunakan untuk sertifikat.'
+                    ], 422);
+                }
+
+                $validated['user_id'] = $registration->user_id;
             }
+            $certificate->update($validated);
         }
-
-        // Upload file sertifikat baru
-        if ($request->hasFile('certificate_file')) {
-
-            // Hapus file lama
-            if ($certificate->file_path) {
-                Storage::disk('public')->delete($certificate->file_path);
-            }
-
-            // Simpan file baru ke file_path
-            $validated['file_path'] = $request->file('certificate_file')
-                ->store('certificates', 'public');
-        }
-
-        // Hilangkan input upload dari data yang akan disimpan
-        unset($validated['certificate_file']);
-
-        $certificate->update($validated);
 
         return response()->json([
-            'message' => 'Sertifikat berhasil diperbarui',
-            'data' => $certificate->load('registration.user', 'registration.event')
-        ], 200);
+            'message' => 'Data sertifikat berhasil diperbarui.',
+            'data' => $certificate->fresh()
+        ]);
     }
 
-    // DELETE: Menghapus sertifikat (admin saja)
-    public function destroy($id)
+    // Menghapus pengajuan sertifikat (admin saja)
+    public function destroy(Request $request, $id)
     {
-        $certificate = Certificate::find($id);
-
-        if (!$certificate) {
+        if ($request->user()->role !== 'admin') {
             return response()->json([
-                'message' => 'Sertifikat tidak ditemukan'
-            ], 404);
+                'message' => 'Hanya admin yang dapat menghapus sertifikat.'
+            ], 403);
         }
 
-        // Hapus file sertifikat dari storage
-        if ($certificate->file_path) {
-            Storage::disk('public')->delete($certificate->file_path);
-        }
-
+        $certificate = Certificate::findOrFail($id);
         $certificate->delete();
 
         return response()->json([
-            'message' => 'Sertifikat berhasil dihapus'
-        ], 200);
+            'message' => 'Data sertifikat berhasil dihapus.'
+        ]);
     }
 }

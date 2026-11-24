@@ -11,16 +11,20 @@ return new class extends Migration
         Schema::create('certificates', function (Blueprint $table) {
             $table->id('certificate_id');
 
+            $table->foreignId('user_id')
+                ->constrained('users')
+                ->restrictOnDelete();
+
             $table->unsignedBigInteger('registration_id')->unique();
             $table->foreign('registration_id')
                 ->references('registration_id')
                 ->on('registrations')
                 ->restrictOnDelete();
 
-            $table->string('certificate_number')->unique();
+            $table->string('recipient_name');
+            $table->string('certificate_number')->nullable()->unique();
             $table->dateTime('issued_at')->nullable();
-            $table->string('file_path')->nullable();
-            $table->string('status')->default('Aktif');
+            $table->string('status')->default('Menunggu');
 
             $table->timestamps();
         });
